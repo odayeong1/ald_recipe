@@ -4,6 +4,7 @@ import pandas as pd
 import joblib
 import streamlit as st
 import requests
+import gdown
 from scipy.optimize import differential_evolution
 
 # ------------------------------------------------------------
@@ -152,26 +153,25 @@ FILM_PARAMS = {
 
 
 # ============================================================
-# 3. 모델 로드 (구글 드라이브에서 자동 다운로드)
+# 3. 모델 로드 (구글 드라이브 + gdown)
 # ============================================================
 
-# 막 종류별 구글 드라이브 다운로드 URL
-MODEL_URLS = {
-    "Al2O3": "https://drive.google.com/uc?export=download&id=197cpjbyOZhKWxwmGENPAj7N3csQU1rFo",
-    "HfO2":  "https://drive.google.com/uc?export=download&id=1IPCIZGl4pirHyEahkr6wMLI7o-M9g-NK",
-    "SiO2":  "https://drive.google.com/uc?export=download&id=16rav5Bz1KcWM0CKNbaV3qpN0Ug_UmpJ0",
-    "TiO2":  "https://drive.google.com/uc?export=download&id=19tieTRNH858IAfFqrj7T_fy3Mhe5TrWC",
+# 구글 드라이브 파일 ID만 정리
+MODEL_IDS = {
+    "Al2O3": "197cpjbyOZhKWxwmGENPAj7N3csQU1rFo",
+    "HfO2":  "1IPCIZGl4pirHyEahkr6wMLI7o-M9g-NK",
+    "SiO2":  "16rav5Bz1KcWM0CKNbaV3qpN0Ug_UmpJ0",
+    "TiO2":  "19tieTRNH858IAfFqrj7T_fy3Mhe5TrWC",
 }
 
 
-def download_if_needed(url: str, local_path: str):
-    """로컬에 모델 파일이 없으면 구글 드라이브에서 다운로드."""
+def download_if_needed(file_id: str, local_path: str):
+    """로컬에 모델 파일이 없으면 구글 드라이브에서 gdown으로 다운로드."""
     if not os.path.exists(local_path):
         with st.spinner(f"모델 파일 다운로드 중... ({os.path.basename(local_path)})"):
-            r = requests.get(url)
-            r.raise_for_status()
-            with open(local_path, "wb") as f:
-                f.write(r.content)
+            url = f"https://drive.google.com/uc?id={file_id}"
+            # quiet=False 로 하면 로그 조금 보이고, quiet=True 로 하면 조용함
+            gdown.download(url, local_path, quiet=True)
 
 
 @st.cache_resource
@@ -179,16 +179,27 @@ def load_model(film: str):
     """
     막 종류(film)에 맞는 모델을 로드.
     - 처음 한 번은 구글 드라이브에서 다운로드
-    - 이후에는 로컬 캐시 + streamlit 캐시 사용
+    - 이후에는 로컬 + streamlit 캐시 사용
     """
-    if film not in MODEL_URLS:
+    if film not in MODEL_IDS:
         raise ValueError(f"지원하지 않는 막 타입입니다: {film}")
 
     fname = f"{film.lower()}_ald_rf_model.joblib"
-    url = MODEL_URLS[film]
+    file_id = MODEL_IDS[film]
 
-    download_if_needed(url, fname)
-    model = joblib.load(fname)
+    # 1차 다운로드
+    download_if_needed(file_id, fname)
+
+    # 혹시 이전에 깨진 파일이 남아 있을 수 있으니 한 번 더 안전장치
+    try:
+        model = joblib.load(fname)
+    except Exception:
+        # 파일 삭제 후 한 번 더 받아보기
+        if os.path.exists(fname):
+            os.remove(fname)
+        download_if_needed(file_id, fname)
+        model = joblib.load(fname)
+
     return model
 
 
@@ -368,3 +379,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
