@@ -318,9 +318,13 @@ def main():
 
     model = load_model(film)
 
-    if st.button("최적화 실행"):
-        with st.spinner("Searching optimal recipe..."):
-            res = run_opt(model, target_t, params)
+   if st.button("최적화 실행"):
+
+    # 여기서만 다운로드 & 로드
+    model = load_model(film)
+
+    with st.spinner("Searching optimal recipe..."):
+        res = run_opt(model, target_t, params)
 
         # 성공 메세지 + 효과
         st.success(f"{film} 최적화 완료!")
@@ -379,4 +383,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
