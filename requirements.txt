@@ -4,3 +4,4 @@ pandas
 joblib
 scipy
 scikit-learn
+requests
